@@ -32,13 +32,14 @@ character*80 coord_name
 character*80 newlib
 character*80 dbas   
 character*80 homedir,cefinerc
+character*2 baselem(85)
 real*8 extol !tolerance of K integrals
 logical RI, MP2, DFT, VDW, DESY, OPT, KEEP, UHF, MODEHT,QUICK,TROLD
 logical DFPT2, FC, pr, OR, RIK, NOVDW, EX, CP1, CP2, POL, CC, ECP
 logical COORD, FOLD, MOLD, RANGST, SCS, TRUNC,LIB,ALIB,LAP,NDIFF
 logical da,FON,TS,R12,MRCI,COSMO,OPTI,ECHO,TEST,OLDMO,SOS,ZERO,FAKE
 logical strange_elem,diffuse, egrid, XMOL, MARIJ,REF,nori,BJ,ATM,D4
-logical deletion_failed
+logical deletion_failed, RMGF
 logical cosx ! SAW: added seminumerical exchange = COSX
 logical modbas  !basis defined in input
 logical modgrid  !grid defined in input
@@ -58,7 +59,7 @@ integer iat(10000)
 
 pr=.true. 
 !    .'--------------------------------------------'
-      if(pr) write(*,*)'Command line define V2.2, SG,HK 2006-18  August 2018 (-h for help) '
+      if(pr) write(*,*)'Command line define V2.21, SG,HK 2006-18  August 2018 (-h for help) '
 !     write(*,*)
 !    .'--------------------------------------------'
       io=1
@@ -133,6 +134,7 @@ pr=.true.
       MARIJ=.false.
       QUICK=.false.
 !       BJ=.false.
+      RMGF=.false.
 !JGB BJ as default (!)
       BJ=.true.
       ZERO=.false.
@@ -286,6 +288,7 @@ pr=.true.
          write(*,*)'   -diff (add spd/sp diffuse functions)'
          write(*,*)'   -test (do not call define)'
          write(*,*)'   -nodiff (turns off diff density feature of TM)'
+         write(*,*)'   -gf  (remove g/f on H-Rn in def2-QZVP only)'
          write(*,*)'needs: <coord> file in TM format'
          write(*,*)'optional files    : <.SYM> with Schoenflies symbol'
          write(*,*)'(in <coord> dir)    <.UHF> integer number Na-Nb'
@@ -356,6 +359,7 @@ pr=.true.
              NOVDW=.true.
              func='tpss'
             endif
+            if(index(arg(i),'-gf').ne.0)    RMGF=.true.
             if(index(arg(i),'-marij ').ne.0) MARIJ=.true.
             if(index(arg(i),'-fold').ne.0)  FOLD=.true. 
             if(index(arg(i),'-mold').ne.0)  MOLD=.true. 
@@ -835,6 +839,36 @@ endif
          enddo
          close(142)
       endif
+
+! RMGF -gf for def2-QZVP
+      DATA baselem/'he', &
+      'li','be','b ','c ','n ','o ','f ','ne',  &
+      'na','mg','al','si','p ','s ','cl','ar',  &
+      'k ','ca','sc','ti','v ','cr','mn','fe','co','ni','cu',  &
+      'zn','ga','ge','as','se','br','kr',  &
+      'rb','sr','y ','zr','nb','mo','tc','ru','rh','pd','ag',  &
+      'cd','in','sn','sb','te','i ','xe',  &
+      'cs','ba','la','ce','pr','nd','pm','sm','eu','gd','tb','dy',  &
+      'ho','er','tm','yb','lu','hf','ta','w ','re','os','ir','pt',  &
+      'au','hg','tl','pb','bi','po','at','rn'/
+
+      if(RMGF)then
+        write(io,'('' bm'')')          
+        write(io,'(''h def2-QZVP'')') 
+        write(io,'(''del'')')
+        write(io,'(''f'')')
+        write(io,'('' '')')
+        do i=1,85
+          write(io,'('' bm'')')
+          write(io,'(a,1x,a)')trim(baselem(i)),'def2-QZVP'
+          !write(io,'(''b def2-QZVP'')')
+          write(io,'(''del'')')
+          write(io,'(''g'')')
+          write(io,'('' '')')
+        enddo
+      endif
+ 
+
 ! c CP correction
       if(CP1.or.CP2)then
          call system('splitmol > splitmol.tmp')

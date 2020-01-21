@@ -1,10 +1,10 @@
 cefine
 ======
 
-This is the official repository of the ``cefine`` program developed by the 
+This is the official repository of the `cefine` program developed by the 
 Grimme group in Bonn.
 
-`cefine` is a commandline wrapper around the `TURBOMOLE` ``define`` program. 
+`cefine` is a commandline wrapper around the `TURBOMOLE` `define` program. 
 The program is distributed as is! 
 
 
@@ -103,6 +103,7 @@ cml-input: cefine -h
     -diff (add spd/sp diffuse functions)
     -test (do not call define)
     -nodiff (turns off diff density feature of TM)
+    -gf  (remove g/f on H-Rn in def2-QZVP only)
  needs: <coord> file in TM format
  optional files    : <.SYM> with Schoenflies symbol
  (in <coord> dir)    <.UHF> integer number Na-Nb
