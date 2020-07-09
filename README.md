@@ -104,6 +104,7 @@ cml-input: cefine -h
     -test (do not call define)
     -nodiff (turns off diff density feature of TM)
     -gf  (remove g/f on H-Rn in def2-QZVP only)
+    -fpol  (remove f on B-Rn in def2-TZVPD only)
  needs: <coord> file in TM format
  optional files    : <.SYM> with Schoenflies symbol
  (in <coord> dir)    <.UHF> integer number Na-Nb
