@@ -33,13 +33,14 @@ character*80 newlib
 character*80 dbas   
 character*80 homedir,cefinerc
 character*2 baselem(85)
+character*2 baselem2(60)
 real*8 extol !tolerance of K integrals
 logical RI, MP2, DFT, VDW, DESY, OPT, KEEP, UHF, MODEHT,QUICK,TROLD
 logical DFPT2, FC, pr, OR, RIK, NOVDW, EX, CP1, CP2, POL, CC, ECP
 logical COORD, FOLD, MOLD, RANGST, SCS, TRUNC,LIB,ALIB,LAP,NDIFF
 logical da,FON,TS,R12,MRCI,COSMO,OPTI,ECHO,TEST,OLDMO,SOS,ZERO,FAKE
 logical strange_elem,diffuse, egrid, XMOL, MARIJ,REF,nori,BJ,ATM,D4
-logical deletion_failed, RMGF
+logical deletion_failed, RMGF, RMF
 logical cosx ! SAW: added seminumerical exchange = COSX
 logical modbas  !basis defined in input
 logical modgrid  !grid defined in input
@@ -135,6 +136,7 @@ pr=.true.
       QUICK=.false.
 !       BJ=.false.
       RMGF=.false.
+      RMF=.false.
 !JGB BJ as default (!)
       BJ=.true.
       ZERO=.false.
@@ -289,6 +291,7 @@ pr=.true.
          write(*,*)'   -test (do not call define)'
          write(*,*)'   -nodiff (turns off diff density feature of TM)'
          write(*,*)'   -gf  (remove g/f on H-Rn in def2-QZVP only)'
+         write(*,*)'   -fpol  (remove f on B-Rn in def2-TZVPD only)'
          write(*,*)'needs: <coord> file in TM format'
          write(*,*)'optional files    : <.SYM> with Schoenflies symbol'
          write(*,*)'(in <coord> dir)    <.UHF> integer number Na-Nb'
@@ -360,6 +363,7 @@ pr=.true.
              func='tpss'
             endif
             if(index(arg(i),'-gf').ne.0)    RMGF=.true.
+            if(index(arg(i),'-fpol').ne.0)    RMF=.true.
             if(index(arg(i),'-marij ').ne.0) MARIJ=.true.
             if(index(arg(i),'-fold').ne.0)  FOLD=.true. 
             if(index(arg(i),'-mold').ne.0)  MOLD=.true. 
@@ -867,7 +871,27 @@ endif
           write(io,'('' '')')
         enddo
       endif
- 
+
+! RMF -f for all def2_TZVPD
+      DATA baselem2/ &
+      'b ','c ','n ','o ','f ','ne',  &
+      'al','si','p ','s ','cl','ar',  &
+      'sc','ti','v ','cr','mn','fe','co','ni','cu',  &
+      'zn','ga','ge','as','se','br','kr',  &
+      'y ','zr','nb','mo','tc','ru','rh','pd','ag',  &
+      'cd','in','sn','sb','te','i ','xe',  &
+      'la','hf','ta','w ','re','os','ir','pt',  &
+      'au','hg','tl','pb','bi','po','at','rn'/
+
+      if(RMF)then
+        do i=1,60
+          write(io,'('' bm'')')
+          write(io,'(a,1x,a)')trim(baselem2(i)),'def2-TZVPD'
+          write(io,'(''del'')')
+          write(io,'(''f'')')
+          write(io,'('' '')')
+        enddo                                               
+      endif
 
 ! c CP correction
       if(CP1.or.CP2)then
