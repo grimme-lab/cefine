@@ -44,12 +44,13 @@ logical deletion_failed, RMGF, RMF
 logical cosx ! SAW: added seminumerical exchange = COSX
 logical modbas  !basis defined in input
 logical modgrid  !grid defined in input
+logical modrad  !radsize defined in input
 logical noauxg  !remove g-fkt from auxbasis
 logical modaux !aux handling defined in input
 logical hf3c ! perform HF-3c calculation
 logical donl ! perform nl non-self-consistent
 logical gcpinfo !for pbe-3c, pbe0-3c, b3-lyp-3c (echo into control)
-integer ricore, scfconv, intmem, thime, maxcor, rpacor
+integer ricore, scfconv, intmem, thime, maxcor, rpacor,radsize
 integer charge, maxiter, nheavy, nopen, nat
 integer kfrag, libnr, l, ntypes, irare, att(20)
 real*8  desythr,xx(5),thize,cosmodk,dum,fp
@@ -60,7 +61,7 @@ integer iat(10000)
 
 pr=.true. 
 !    .'--------------------------------------------'
-      if(pr) write(*,*)'Command line define V2.22, SG,HK 2006-18  August 2018 (-h for help) '
+      if(pr) write(*,*)'Command line define V2.23, SG,HK 2006-18  August 2018 (-h for help) '
 !     write(*,*)
 !    .'--------------------------------------------'
       io=1
@@ -151,6 +152,7 @@ pr=.true.
       modaux=.false.
       noauxg=.false.
       modgrid=.false.
+      modrad=.false.
       hf3c=.false.
 !FB NL
       donl=.false.
@@ -184,6 +186,10 @@ pr=.true.
             call readl(atmp,xx,nn)
             maxcor=idint(xx(nn))
          endif
+         if(index(atmp,'rpacor').ne.0)then
+            call readl(atmp,xx,nn)
+            rpacor=idint(xx(nn))
+         endif
          if(index(atmp,'twoint').ne.0)then         
             call readl(atmp,xx,nn)
             intmem=idint(xx(nn))
@@ -199,6 +205,11 @@ pr=.true.
             call backstring(atmp,grid,4)
             egrid=.true.
             modgrid=.true.
+         endif
+         if(index(atmp,'radsize').ne.0)then
+            call readl(atmp,xx,nn)
+            radsize=xx(nn)
+            modrad=.true.
          endif
          if(index(atmp,'vdw').ne.0) then
             if(index(atmp,'on').ne.0)BJ=.true.   
@@ -237,6 +248,7 @@ pr=.true.
          write(*,*)'   -func <string>'
          write(*,*)'   -bas  <string>'
          write(*,*)'   -grid <string>'
+         write(*,*)'   -radsize <integer>'
          write(*,*)'   -mp2  (do RI-MP2)'
          write(*,*)'   -scs  (do RI-SCS-MP2)'
          write(*,*)'   -sos  (do RI-SOS-MP2)'
@@ -305,6 +317,7 @@ pr=.true.
          write(*,*)'ricore  INTEGER'
          write(*,*)'twoint  INTEGER'
          write(*,*)'maxcor  INTEGER'
+         write(*,*)'rpacor  INTEGER'
          write(*,*)'fp REAL'
          write(*,*)'vdw     on   #  sets DFT-D2(BJ) '       
          write(*,*)'echo    on   #  more printing'       
@@ -452,6 +465,12 @@ pr=.true.
             if(index(arg(i),'-scfconv').ne.0)then
                call readl(arg(i+1),xx,nn)
                scfconv=idint(xx(1))
+            endif
+!FB radsize
+            if(index(arg(i),'-radsize').ne.0)then
+               call readl(arg(i+1),xx,nn)
+               radsize=idint(xx(1))
+               modrad=.true.
             endif
 !JGB K tolerance
             if(index(arg(i),'-ktol').ne.0)then
@@ -609,6 +628,20 @@ pr=.true.
         DESY=.false.
       endif
 
+!FB define r2scan-3c defaults
+if(func.eq.'r2scan3c') func='r2scan-3c'
+if(func.eq.'r2scan-3c') then
+    !uses gcp 
+    write(*,*) "Use R2SCAN-3C with radsize 10 for gas-phase optimizations and grid m4!"
+    if(.not.modbas) bas='def2-mTZVPP'
+    if(.not.modgrid) grid='m4'
+    if(.not.novdw) then
+        D4=.true.
+        donl=.false.
+        BJ=.false.
+        ATM=.false.
+    endif
+endif
 
 !JGB define PBEh-3c defaults
 if(func.eq.'pbeh3c') func='pbeh-3c'
@@ -1368,6 +1401,14 @@ endif
       if(gcpinfo)then
           call system("echo '$gcp dft/sv(p)' >> control")
       endif
+    
+      !FB change radsize (radial grid points) this is independent
+      !   of gridsize !!!
+      if(modrad) then
+        write(atmp,"(a,i0,a)") "sed -i '/gridsize/a\   radsize    ",radsize,"' control"
+        call system(trim(atmp))
+      endif
+      
 
 !JGB modify K tolerance
 if(extol.gt.0.0d0) then

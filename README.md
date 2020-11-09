@@ -52,6 +52,7 @@ cml-input: cefine -h
     -func <string>
     -bas  <string>
     -grid <string>
+    -radsize <integer>
     -mp2  (do RI-MP2)
     -scs  (do RI-SCS-MP2)
     -sos  (do RI-SOS-MP2)
@@ -118,6 +119,7 @@ cml-input: cefine -h
  ricore  INTEGER
  twoint  INTEGER
  maxcor  INTEGER
+ rpacor  INTEGER
  fp REAL
  vdw     on   #  sets DFT-D2(BJ) 
  echo    on   #  more printing
