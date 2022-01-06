@@ -847,12 +847,14 @@ endif
 ! ECPs
       if(ECP) then
       write(*,*) 'WARNING: Check BASIS/ECPs !!'
-          write(io,*)'ecp  all ecp-2-sdf'
+          write(io,*)'ecp all ecp-vDZP'
+          ! write(io,*)'ecp  all ecp-2-sdf'
         do l=1,ntypes    
          write(io,'('' '')') 
          write(io,'('' '')') 
         enddo
-          write(io,*)'ecp  all ecp-10-sdf'
+          write(io,*)'ecp all ecp-vDZP'
+          ! write(io,*)'ecp  all ecp-10-sdf'
         do l=1,ntypes    
          write(io,'('' '')') 
          write(io,'('' '')') 
@@ -1241,18 +1243,18 @@ endif
          call system("echo '   itrvec 1' >>control")
          call system("echo '   tradius 0.05 ' >>control")
          call system("echo '   radmax  0.05 ' >>control")
-         call system("echo '   threchange  5.0d-7' >>control")
-         call system("echo '   thrrmsgrad  5.0d-5' >>control")
-         call system("echo '   thrmaxdispl 1.0d-1' >>control")
-         call system("echo '   thrrmsdispl 1.0d-1' >>control")
+         !call system("echo '   threchange  5.0d-7' >>control")
+         !call system("echo '   thrrmsgrad  5.0d-5' >>control")
+         !call system("echo '   thrmaxdispl 1.0d-1' >>control")
+         !call system("echo '   thrrmsdispl 1.0d-1' >>control")
       else  
          call system("echo '$statpt'   >>control")
          call system("echo '   itrvec 0' >>control")
          call system("echo '   tradius 0.3 ' >>control")
-         call system("echo '   threchange  5.0d-7' >>control")
-         call system("echo '   thrrmsgrad  5.0d-5' >>control")
-         call system("echo '   thrmaxdispl 1.0d-1' >>control")
-         call system("echo '   thrrmsdispl 1.0d-1' >>control")
+         !call system("echo '   threchange  5.0d-7' >>control")
+         !call system("echo '   thrrmsgrad  5.0d-5' >>control")
+         !call system("echo '   thrmaxdispl 1.0d-1' >>control")
+         !call system("echo '   thrrmsdispl 1.0d-1' >>control")
       endif
 ! specify where to find hessian
       if(TROLD) then    
