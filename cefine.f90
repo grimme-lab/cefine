@@ -984,7 +984,7 @@ endif
          write(io,*)' '
          write(io,*)' '
          write(io,*)' '
-      if(irare.eq.0)write(io,*)'*'
+      if ((irare.eq.0).or.((irare.le.2).and.(charge.eq.1).and.(nopen.eq.1))) write(io,*)'*'
       endif !uhf
       endif ! mos-setup
       write(io,*)'    '
@@ -1548,7 +1548,8 @@ endif
          endif
          if(i.gt.10) na(i)=na(i)+1
 ! cts check for Cu/Pd problem
-         if(i.eq.29.or.i.eq.46) cu_pd=.true.
+         ! if(i.eq.29.or.i.eq.46) cu_pd=.true.
+         if(i.eq.46) cu_pd=.true.
       endif
       goto 10
 100   close(1)
