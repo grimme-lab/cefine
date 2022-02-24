@@ -61,7 +61,7 @@ integer iat(10000)
 
 pr=.true. 
 !    .'--------------------------------------------'
-      if(pr) write(*,*)'Command line define V2.23, SG,HK 2006-18  August 2018 (-h for help) '
+      if(pr) write(*,*)'Command line define V2.23mod, SG,HK,MM 2006-18  January 2022 (-h for help) '
 !     write(*,*)
 !    .'--------------------------------------------'
       io=1
@@ -748,6 +748,22 @@ if(func.eq.'pbe0-3c'.or.func.eq.'pbe03c')then
     if(.not.modaux) noauxg=.true.
     if(extol.lt.0) extol= 2.5d0
 endif
+! MM define wB97X-3c defaults
+if(func.eq.'wb97x-3c'.or.func.eq.'wb97x3c')then
+    write(*,*) 'Setting up wB97X-3c calculation!'
+    func='wb97x-v'
+    D4=.true.
+    BJ=.false.
+    ATM=.false.
+    ZERO=.false.
+    if(.not.modgrid)then
+        grid='m4'
+    endif
+    if(.not.modbas) then
+        bas='vDZP'
+    endif
+    ECP=.true.
+endif
 
 
 
@@ -1384,7 +1400,11 @@ endif
         call system("echo '$disp3 -bj' >> control")
       !FB D4 dispersion
       elseif(D4)then
-         call system("echo '$disp4 ' >> control")
+         if (bas.eq.'vDZP'.and.func.eq.'wb97x-v') then
+             call system("echo '$disp4 --param 1.0 0.2464 0.0 4.737 1.1' >> control")
+         else
+             call system("echo '$disp4 ' >> control")
+         endif
          write(*,*) 'D4 selected'
       endif
       if(ZERO) call system("echo '$disp3 ' >> control")
