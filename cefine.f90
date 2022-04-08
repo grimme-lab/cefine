@@ -1039,19 +1039,19 @@ endif
       endif
       if(RI)then
          write(io,*)'ri '
-         write(io,*)'on '
          if(ALIB) then
-          do l=1,ntypes     ! hok
-          write(io,*)'newlib '
-          write(io,*) trim(newlib)
-          write(io,*) 'lib'
-          enddo
+             do l=1,ntypes     ! hok
+                write(io,*)'newlib '
+                write(io,*) trim(newlib)
+                write(io,*) 'lib'
+             enddo
          endif
          if(func.eq.'wb97x-3c'.or.func.eq.'wb97x3c')then
              write(io,*) 'jbas'
              write(io,*) 'b all universal'
              write(io,*) '*'
          endif
+         write(io,*)'on '
          write(io,*)'m  '
          write(io,*)ricore
          write(io,*)'q'
