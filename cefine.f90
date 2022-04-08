@@ -23,7 +23,7 @@ parameter (maxarg=20)
 character*80 arg(maxarg)    
 character*80 out,run1,run2,run3
 character*80 func           
-character*80 grid          
+character*80 grid,cosxgrid          
 character*80 bas            
 character*80 sym            
 character*80 atmp           
@@ -41,7 +41,7 @@ logical COORD, FOLD, MOLD, RANGST, SCS, TRUNC,LIB,ALIB,LAP,NDIFF
 logical da,FON,TS,R12,MRCI,COSMO,OPTI,ECHO,TEST,OLDMO,SOS,ZERO,FAKE
 logical strange_elem,diffuse, egrid, XMOL, MARIJ,REF,nori,BJ,ATM,D4
 logical deletion_failed, RMGF, RMF
-logical cosx ! SAW: added seminumerical exchange = COSX
+logical cosx,nocosx ! SAW: added seminumerical exchange = COSX
 logical modbas  !basis defined in input
 logical modgrid  !grid defined in input
 logical modrad  !radsize defined in input
@@ -75,6 +75,7 @@ pr=.true.
       desythr=0.05
       scfconv=7
       grid   ='m4'
+      cosxgrid='m2'
       ricore =1000
       intmem =1000
       maxcor =1000
@@ -97,6 +98,7 @@ pr=.true.
       RI   =.true.
       RIK  =.false.
       COSX = .false. !SAW
+      NOCOSX = .false. ! MM
       R12  =.false.
       MODEHT=.false.
       RANGST=.false.
@@ -277,7 +279,8 @@ pr=.true.
          write(*,*)'   -ri'
          write(*,*)'   -nofc (all e-corr. for MP2)'
          write(*,*)'   -rijk (RI for HF/hybrids)'  
-         write(*,*)'   -rijcosx (seminum. exchange w/ COS alg. for hybrids)'   !SAW
+         write(*,*)'   -rijcosx (seminum. exchange w/ COS alg. for hybrids)'   !SAW + MM
+         write(*,*)'   -nosenex (force NO seminum. exchange w/ COS alg. for hybrids)'   !MM
          write(*,*)'   -or (set flags for OR, escf)'
          write(*,*)'   -ex (set flags UV/CD, escf)'
          write(*,*)'   -fold (take forceapprox from previous run)'
@@ -405,6 +408,7 @@ pr=.true.
             if(index(arg(i),'-cp2').ne.0)   CP2=.true. 
             if(index(arg(i),'-rijk').ne.0)  RIK=.true. 
             if(index(arg(i),'-rijcosx').ne.0)  COSX=.true. 
+            if(index(arg(i),'-nosenex').ne.0)  NOCOSX=.true. 
             if(index(arg(i),'-trunc').ne.0) TRUNC=.true. 
             if(index(arg(i),'-fon').ne.0)   FON=.true. 
             if(index(arg(i),'-ts').ne.0)    TS=.true. 
@@ -494,6 +498,9 @@ pr=.true.
             if(index(arg(i),'-grid').ne.0) then
               grid =arg(i+1)
               modgrid=.true.
+            endif
+            if(index(arg(i),'-cosxgrid').ne.0) then
+              cosxgrid =arg(i+1)
             endif
             if(index(arg(i),'-bas').ne.0) then
                bas  =arg(i+1)
@@ -750,8 +757,8 @@ if(func.eq.'pbe0-3c'.or.func.eq.'pbe03c')then
 endif
 ! MM define wB97X-3c defaults
 if(func.eq.'wb97x-3c'.or.func.eq.'wb97x3c')then
-    write(*,*) 'Setting up wB97X-3c calculation!'
-    func='wb97x-v'
+    write(*,*) 'Setting up a wB97X-3c calculation!'
+    func='wb97x-3c'
     D4=.true.
     BJ=.false.
     ATM=.false.
@@ -761,6 +768,9 @@ if(func.eq.'wb97x-3c'.or.func.eq.'wb97x3c')then
     endif
     if(.not.modbas) then
         bas='vDZP'
+    endif
+    if (.not.nocosx) then
+        cosx=.true.
     endif
     ECP=.true.
 endif
@@ -863,14 +873,20 @@ endif
 ! ECPs
       if(ECP) then
       write(*,*) 'WARNING: Check BASIS/ECPs !!'
-          write(io,*)'ecp all ecp-vDZP'
-          ! write(io,*)'ecp  all ecp-2-sdf'
+          if(func.eq.'wb97x-3c'.or.func.eq.'wb97x3c')then
+            write(io,*)'ecp all ecp-vDZP'
+          else
+            write(io,*)'ecp  all ecp-2-sdf'
+          endif
         do l=1,ntypes    
          write(io,'('' '')') 
          write(io,'('' '')') 
         enddo
-          write(io,*)'ecp all ecp-vDZP'
-          ! write(io,*)'ecp  all ecp-10-sdf'
+          if(func.eq.'wb97x-3c'.or.func.eq.'wb97x3c')then
+              write(io,*)'ecp all ecp-vDZP'
+          else
+              write(io,*)'ecp  all ecp-10-sdf'
+          endif
         do l=1,ntypes    
          write(io,'('' '')') 
          write(io,'('' '')') 
@@ -1031,6 +1047,11 @@ endif
           write(io,*) 'lib'
           enddo
          endif
+         if(func.eq.'wb97x-3c'.or.func.eq.'wb97x3c')then
+             write(io,*) 'jbas'
+             write(io,*) 'b all universal'
+             write(io,*) '*'
+         endif
          write(io,*)'m  '
          write(io,*)ricore
          write(io,*)'q'
@@ -1045,10 +1066,11 @@ endif
       elseif(COSX) then
       write(io,*)'senex'
       write(io,*)'on'
-      write(io,*)'y'
+      write(io,*)'yes'
+      write(io,*)'yes'
       write(io,*)'g'
-      write(io,'(a20)') grid
-      write(io,*)'y'
+      write(io,'(a20)') cosxgrid
+      write(io,*)'yes'
       write(io,*)'q'
       endif
 
@@ -1400,11 +1422,7 @@ endif
         call system("echo '$disp3 -bj' >> control")
       !FB D4 dispersion
       elseif(D4)then
-         if (bas.eq.'vDZP'.and.func.eq.'wb97x-v') then
-             call system("echo '$disp4 --param 1.0 0.2464 0.0 4.737 1.1' >> control")
-         else
-             call system("echo '$disp4 ' >> control")
-         endif
+         call system("echo '$disp4 ' >> control")
          write(*,*) 'D4 selected'
       endif
       if(ZERO) call system("echo '$disp3 ' >> control")
