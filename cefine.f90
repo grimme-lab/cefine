@@ -61,7 +61,7 @@ integer iat(10000)
 
 pr=.true. 
 !    .'--------------------------------------------'
-      if(pr) write(*,*)'Command line define V2.23mod, SG,HK,MM 2006-18  January 2022 (-h for help) '
+      if(pr) write(*,*)'Command line define V2.24, SG,HK,MM January 2022 (-h for help) '
 !     write(*,*)
 !    .'--------------------------------------------'
       io=1
