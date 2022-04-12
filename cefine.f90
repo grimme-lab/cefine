@@ -279,8 +279,9 @@ pr=.true.
          write(*,*)'   -ri'
          write(*,*)'   -nofc (all e-corr. for MP2)'
          write(*,*)'   -rijk (RI for HF/hybrids)'  
-         write(*,*)'   -rijcosx (seminum. exchange w/ COS alg. for hybrids)'   !SAW + MM
+         write(*,*)'   -senex (seminum. exchange w/ COS alg. for hybrids)'   !SAW + MM
          write(*,*)'   -nosenex (force NO seminum. exchange w/ COS alg. for hybrids)'   !MM
+         write(*,*)'   -senexgrid <string>  # default: m2'
          write(*,*)'   -or (set flags for OR, escf)'
          write(*,*)'   -ex (set flags UV/CD, escf)'
          write(*,*)'   -fold (take forceapprox from previous run)'
@@ -407,7 +408,7 @@ pr=.true.
             if(index(arg(i),'-cp1').ne.0)   CP1=.true. 
             if(index(arg(i),'-cp2').ne.0)   CP2=.true. 
             if(index(arg(i),'-rijk').ne.0)  RIK=.true. 
-            if(index(arg(i),'-rijcosx').ne.0)  COSX=.true. 
+            if(index(arg(i),'-senex').ne.0)  COSX=.true. 
             if(index(arg(i),'-nosenex').ne.0)  NOCOSX=.true. 
             if(index(arg(i),'-trunc').ne.0) TRUNC=.true. 
             if(index(arg(i),'-fon').ne.0)   FON=.true. 
@@ -499,7 +500,7 @@ pr=.true.
               grid =arg(i+1)
               modgrid=.true.
             endif
-            if(index(arg(i),'-cosxgrid').ne.0) then
+            if(index(arg(i),'-senexgrid').ne.0) then
               cosxgrid =arg(i+1)
             endif
             if(index(arg(i),'-bas').ne.0) then
@@ -775,6 +776,11 @@ if(func.eq.'wb97x-3c'.or.func.eq.'wb97x3c')then
     ECP=.true.
 endif
 
+! MM set up ECP in general if vDZP basis is chosen
+if (bas .eq. 'vDZP') then
+    ECP=.true.
+endif
+
 
 
 ! c do reference single point?
@@ -873,7 +879,7 @@ endif
 ! ECPs
       if(ECP) then
       write(*,*) 'WARNING: Check BASIS/ECPs !!'
-          if(func.eq.'wb97x-3c'.or.func.eq.'wb97x3c')then
+          if(bas .eq. 'vDZP')then
             write(io,*)'ecp all ecp-vDZP'
           else
             write(io,*)'ecp  all ecp-2-sdf'
@@ -882,7 +888,7 @@ endif
          write(io,'('' '')') 
          write(io,'('' '')') 
         enddo
-          if(func.eq.'wb97x-3c'.or.func.eq.'wb97x3c')then
+          if(bas .eq. 'vDZP')then
               write(io,*)'ecp all ecp-vDZP'
           else
               write(io,*)'ecp  all ecp-10-sdf'
@@ -1046,7 +1052,7 @@ endif
                 write(io,*) 'lib'
              enddo
          endif
-         if(func.eq.'wb97x-3c'.or.func.eq.'wb97x3c')then
+         if(bas .eq. 'vDZP')then
              write(io,*) 'jbas'
              write(io,*) 'b all universal'
              write(io,*) '*'
