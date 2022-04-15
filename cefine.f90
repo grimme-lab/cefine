@@ -42,6 +42,7 @@ logical da,FON,TS,R12,MRCI,COSMO,OPTI,ECHO,TEST,OLDMO,SOS,ZERO,FAKE
 logical strange_elem,diffuse, egrid, XMOL, MARIJ,REF,nori,BJ,ATM,D4
 logical deletion_failed, RMGF, RMF
 logical cosx,nocosx ! SAW: added seminumerical exchange = COSX
+logical hcore ! Modify control file to initiate hcore guess
 logical modbas  !basis defined in input
 logical modgrid  !grid defined in input
 logical modrad  !radsize defined in input
@@ -99,6 +100,7 @@ pr=.true.
       RIK  =.false.
       COSX = .false. !SAW
       NOCOSX = .false. ! MM
+      hcore = .false.
       R12  =.false.
       MODEHT=.false.
       RANGST=.false.
@@ -410,6 +412,7 @@ pr=.true.
             if(index(arg(i),'-rijk').ne.0)  RIK=.true. 
             if(index(arg(i),'-senex').ne.0)  COSX=.true. 
             if(index(arg(i),'-nosenex').ne.0)  NOCOSX=.true. 
+            if(index(arg(i),'-hcore').ne.0)  hcore=.true. 
             if(index(arg(i),'-trunc').ne.0) TRUNC=.true. 
             if(index(arg(i),'-fon').ne.0)   FON=.true. 
             if(index(arg(i),'-ts').ne.0)    TS=.true. 
@@ -1454,7 +1457,19 @@ endif
         write(atmp,"(a,i0,a)") "sed -i '/gridsize/a\   radsize    ",radsize,"' control"
         call system(trim(atmp))
       endif
-      
+        
+      if (sym .eq. "c1" .and. hcore) then
+          write(*,*) "! Forcing HCORE guess !"
+          inquire(file="alpha", exist=da)
+          if(da)then
+              call system("sed -i 's/$uhfmo_alpha/$uhfmo_alpha none/g' control")
+              call system("sed -i 's/$uhfmo_beta/$uhfmo_beta none/g' control")
+              call system("rm -f alpha beta")
+          else
+              call system("sed -i 's/$scfmo/$scfmo none/g' control")
+              call system("rm -f mos")
+          endif
+      endif
 
 !JGB modify K tolerance
 if(extol.gt.0.0d0) then
