@@ -20,7 +20,6 @@ implicit none
 
 integer maxarg,io,i,nn
 parameter (maxarg=20)
-character*80 list
 character*80 arg(maxarg)    
 character*80 out,run1,run2,run3
 character*80 func           
@@ -55,7 +54,7 @@ logical gcpinfo !for pbe-3c, pbe0-3c, b3-lyp-3c (echo into control)
 integer ricore, scfconv, intmem, thime, maxcor, rpacor,radsize
 integer charge, maxiter, nheavy, nopen, nat
 integer kfrag, libnr, l, ntypes, irare, att(20)
-real*8  desythr,xx(5),thize,cosmodk,dum,fp,mscale
+real*8  desythr,xx(5),thize,cosmodk,dum,fp
 
 !     coord file handling
 real*8 xyz(3,10000)
@@ -164,11 +163,10 @@ pr=.true.
 !FB gcpinfo
       gcpinfo=.false.
 
-    !> Big check for .cefinerc existance
-      CALL get_environment_variable("HOME", homedir) !> get the home directory path to homedir variable
-      cefinerc=trim(homedir)//'/.cefinerc'!> to remove trailing character and con
-      inquire(file=cefinerc,exist=da) !> check for the existance
-      if(da)then !> exist
+      CALL get_environment_variable("HOME", homedir)
+      cefinerc=trim(homedir)//'/.cefinerc'
+      inquire(file=cefinerc,exist=da)
+      if(da)then
          write(*,*) cefinerc
          open(unit=20,file=cefinerc)
  842     read(20,'(a)',end=942)atmp
@@ -237,21 +235,20 @@ pr=.true.
             
 
 
-      arg=''!> string array with 20 members as a default
+      arg=''
       do i=1,maxarg
-         call getarg(i,arg(i)) !> to retrieve i-argument to arg string array
+         call getarg(i,arg(i))
       enddo
       !FB print cml-input
       write(6,'(a,1x)',advance="no") 'cml-input: cefine'
       do i=1,maxarg
-         write(6,'(a,1x)',advance="no")trim(arg(i)) !> to check if args were correctly read
+         write(6,'(a,1x)',advance="no")trim(arg(i))
       enddo
       write(*,*)
 
-      if(arg(1).eq.'-h' .or. arg(1).eq.'?' .or. arg(1).eq.'-help')then !> help routine
+      if(arg(1).eq.'-h' .or. arg(1).eq.'?' .or. arg(1).eq.'-help')then
          write(*,*)'options:'
          write(*,*)'   -hf (def: RI-DFT/TPSS)'
-         write(*,*)'   -msc_exc <list> <mass_factor> (mass scaling of atoms from the list by 1.0E+07 as a default)'
          write(*,*)'   -func <string>'
          write(*,*)'   -bas  <string>'
          write(*,*)'   -grid <string>'
@@ -333,13 +330,12 @@ pr=.true.
          write(*,*)'marij        #sets $marij '
          write(*,*)'no-rij       #no RIJ for hybrids, if functional is known'
          write(*,*)'nodiff       #turns off diff density feature of TM'
-         write(*,*)'msc_exc  LIST     #mass scales all atoms except specified here, like mscale_except 1,5-9,15-28'
-         stop !> it is terminated after echo
+         stop
       endif
 
-      do i=1,maxarg !> go through all arguments (maxarg=20)
-         if(arg(i).ne.'')then !> not blank
-            if(index(arg(i),'-ref').ne.0) REF=.true. !> just to find -ref
+      do i=1,maxarg
+         if(arg(i).ne.'')then
+            if(index(arg(i),'-ref').ne.0) REF=.true.
             if(index(arg(i),'-fake').ne.0) FAKE=.true.
             if(index(arg(i),'-ecp').ne.0) ECP=.true.
             !FB -d3atm
@@ -431,7 +427,7 @@ pr=.true.
             if(index(arg(i),'-test').ne.0)  TEST=.true.
             if(index(arg(i),'-oldmo').ne.0) OLDMO=.true.
             if(index(arg(i),'-pmos').ne.0) OLDMO=.true.
-            if(index(arg(i),'-trold').ne.0) TROLD=.true. ! cbann: enable use of old hessian for TS search?
+            if(index(arg(i),'-trold').ne.0) TROLD=.true. ! cbann: enable use of old hessian for TS search
             if(index(arg(i),'-cc ').ne.0) then 
              CC=.true.
              DFT=.false.
@@ -536,10 +532,6 @@ pr=.true.
             endif                                ! ...
 !c keep outputs for debuging purposes
             if(index(arg(i),'-keep').ne.0)KEEP=.true. 
-            if(index(arg(i),'-msc_exc').ne.0) then
-                list=arg(i+1)
-                read(arg(i+2),*,IOSTAT=err) mscale
-                if (err .ne. 0) mscale=1000000
          endif
       enddo
 !c read possible file .SYM and .UHF
