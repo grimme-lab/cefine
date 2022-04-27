@@ -18,8 +18,9 @@
 Program comand_line_define
 implicit none
 
-integer maxarg,io,i,nn
+integer maxarg,io,i,nn,err
 parameter (maxarg=20)
+character*80 list
 character*80 arg(maxarg)    
 character*80 out,run1,run2,run3
 character*80 func           
@@ -53,7 +54,8 @@ logical gcpinfo !for pbe-3c, pbe0-3c, b3-lyp-3c (echo into control)
 integer ricore, scfconv, intmem, thime, maxcor, rpacor,radsize
 integer charge, maxiter, nheavy, nopen, nat
 integer kfrag, libnr, l, ntypes, irare, att(20)
-real*8  desythr,xx(5),thize,cosmodk,dum,fp
+real*8  desythr,xx(5),thize,cosmodk,dum,fp,mscale
+integer, allocatable :: idx(:)
 
 !     coord file handling
 real*8 xyz(3,10000)
@@ -159,9 +161,10 @@ pr=.true.
 !FB gcpinfo
       gcpinfo=.false.
 
-      CALL get_environment_variable("HOME", homedir)
-      cefinerc=trim(homedir)//'/.cefinerc'
-      inquire(file=cefinerc,exist=da)
+      !> check for existence of .cefinerc
+      CALL get_environment_variable("HOME", homedir) !> get home directory to variable
+      cefinerc=trim(homedir)//'/.cefinerc' !> to remove trailing character
+      inquire(file=cefinerc,exist=da) !> check for existence
       if(da)then
          write(*,*) cefinerc
          open(unit=20,file=cefinerc)
@@ -226,7 +229,7 @@ pr=.true.
          endif
          if(index(atmp,'nodiff').ne.0)NDIFF=.true. 
          goto 842
- 942     close(20)
+942     close(20)
       endif
             
 
@@ -253,6 +256,7 @@ pr=.true.
          write(*,*)'   -scs  (do RI-SCS-MP2)'
          write(*,*)'   -sos  (do RI-SOS-MP2)'
          write(*,*)'   -lsos /-lap  (do RI-Laplace-SOS-MP2)'
+         write(*,*)'   -msc_exc  <string> (z.B. 1-9, list of atoms that should NOT be scaled) <real> (scaling factor, default 1000000)'
          write(*,*)'   -cc  (do RI-CCSD(T))'
          write(*,*)'   -d3   ($disp3 -bj)'
          write(*,*)'   -d3atm ($disp3 -bj -abc)' ! FB implemented
@@ -503,6 +507,8 @@ pr=.true.
 ! c    .         index(arg(i),'-f').ne.0)then
                func=arg(i+1)           
                DFT=.true.
+               write(*,*) func
+               STOP
             endif
             if(index(arg(i),'-angst').ne.0)RANGST=.true. 
 
@@ -521,6 +527,20 @@ pr=.true.
             endif                                ! ...
 !c keep outputs for debuging purposes
             if(index(arg(i),'-keep').ne.0)KEEP=.true. 
+            if(index(arg(i),'-msc_exc').ne.0)then
+               !call to_list()
+               !call readl(arg(i+1),xx,nn)
+               list=arg(i+1)
+               if ( len(list) .eq. 0 ) then
+                   write (*,*) "The list of atoms are not provided, masses will not be scaled"
+               else
+                   call string_to_integer(list,idx)
+               endif
+                   
+               read(arg(i+2),*,IOSTAT=err) mscale
+               if (err .ne. 0) mscale=1000000
+               
+            endif
          endif
       enddo
 !c read possible file .SYM and .UHF
@@ -2119,9 +2139,60 @@ endif
        close(4)
        end
 
+       subroutine string_to_integer(strg,idx)
+         character(len=*) :: strg
+         character(len=:),allocatable :: value1,value2
+         integer, allocatable :: idx(:)
+         integer :: i,comma,skip,before,after,err
+         write(*,*) 'entered subroutine',strg
+         !do
+            comma = index(strg,",")
+            if (comma .ne. 0) then
+                 value1=strg(:comma-1)
+                 skip = index(value1,"-")
+                 if (skip .ne. 0) then
+                     read(value1(:skip-1),*,IOSTAT=err) before
+                     if (err .ne. 0) then
+                        write(*,*) 'List specified not correctly, termination of cefine'
+                        STOP
+                     else
+                        print *,before
+                     endif
+                     
+                     read(value1(skip+1:),*,IOSTAT=err) after
+                     if (err .ne. 0) then
+                        write(*,*) 'List specified not correctly, termination of cefine'
+                        STOP
+                     else
+                        print *,after
+                     endif
+                     if (after<=before) then
+                        write(*,*) 'List specified not correctly, termination of cefine'
+                        STOP
+                     else
+                        do i=before,after
+                           call resize(idx)
+                  endif
+            else 
+                 !exit
+            endif
+         !enddo
+    
+
+        
+       end subroutine string_to_integer
+
+       subroutine resize(idx)
+         integer,allocatable::idx(:)
+         integer :: k
+         if (.not.(allocated(idx))) then
+            allocate(idx(1))
+         else
+
+       end subroutine resize
+
 !       subroutine setL(L,arg)
 !       logical L,arg
 !       L=arg
 !       print *,L
-!       end subroutine
-
+!       end subroutine 
