@@ -15,7 +15,13 @@
 ! You should have received a copy of the GNU Lesser General Public License
 ! along with cefine. If not, see <https://www.gnu.org/licenses/>.
 
+module dyn_array 
+   integer, allocatable :: idx(:)
+end module
+
 Program comand_line_define
+
+use dyn_array
 implicit none
 
 integer maxarg,io,i,nn,err
@@ -55,7 +61,6 @@ integer ricore, scfconv, intmem, thime, maxcor, rpacor,radsize
 integer charge, maxiter, nheavy, nopen, nat
 integer kfrag, libnr, l, ntypes, irare, att(20)
 real*8  desythr,xx(5),thize,cosmodk,dum,fp,mscale
-integer, allocatable :: idx(:)
 
 !     coord file handling
 real*8 xyz(3,10000)
@@ -534,7 +539,9 @@ pr=.true.
                if ( len(list) .eq. 0 ) then
                    write (*,*) "The list of atoms are not provided, masses will not be scaled"
                else
-                   call string_to_integer(list,idx)
+                   !allocate(idx)
+                   print *, size(idx)
+                     call string_to_integer(list)!,idx)
                endif
                    
                read(arg(i+2),*,IOSTAT=err) mscale
@@ -2139,58 +2146,147 @@ endif
        close(4)
        end
 
-       subroutine string_to_integer(strg,idx)
+       subroutine string_to_integer(strg)
+         use dyn_array
+         implicit none
          character(len=*) :: strg
+         
          character(len=:),allocatable :: value1,value2
-         integer, allocatable :: idx(:)
-         integer :: i,comma,skip,before,after,err
-         write(*,*) 'entered subroutine',strg
-         !do
+         integer :: t, i,comma,skip,before,after,error,last,single
+         integer, allocatable:: test(:)
+         logical :: repetition
+
+         do 
             comma = index(strg,",")
             if (comma .ne. 0) then
                  value1=strg(:comma-1)
                  skip = index(value1,"-")
                  if (skip .ne. 0) then
-                     read(value1(:skip-1),*,IOSTAT=err) before
-                     if (err .ne. 0) then
-                        write(*,*) 'List specified not correctly, termination of cefine'
-                        STOP
-                     else
-                        print *,before
+                        read(value1(:skip-1),*,IOSTAT=error) before
+                        call check(error)
+                        
+                        read(value1(skip+1:),*,IOSTAT=error) after 
+                        call check(error)
+
+                        if (after<=before) then 
+                           error = 1
+                           call check(error)
+                        else
+                        
+                           do i=before,after
+                              if (allocated(idx)) call check_for_repeat(i,repetition)
+                              if (.not.repetition) then
+                                 call resize
+                                 last=size(idx)
+                                 idx(last)=i
+                              endif
+                           enddo
+
+                        endif
+
+                        strg=strg(comma+1:)
+                  else
+                     read(value1(:comma-1),*,IOSTAT=error) single
+                     call check(error)
+                     
+                     if (allocated(idx)) call check_for_repeat(single,repetition)
+                     if (.not.repetition) then
+
+                        call resize
+                        last=size(idx)
+                        idx(last)=single
+                    
+                     
                      endif
                      
-                     read(value1(skip+1:),*,IOSTAT=err) after
-                     if (err .ne. 0) then
-                        write(*,*) 'List specified not correctly, termination of cefine'
-                        STOP
-                     else
-                        print *,after
-                     endif
-                     if (after<=before) then
-                        write(*,*) 'List specified not correctly, termination of cefine'
-                        STOP
-                     else
-                        do i=before,after
-                           call resize(idx)
+                     strg=strg(comma+1:)
+                     
                   endif
-            else 
-                 !exit
+            else
+                 skip = index(strg,"-")
+                 if (skip .ne. 0) then
+                        read(strg(:skip-1),*,IOSTAT=error) before
+                        call check(error)
+                        
+                        read(strg(skip+1:),*,IOSTAT=error) after 
+                        call check(error)
+
+                        if (after<=before) then 
+                           error=1
+                           call check(error)
+                        else
+                        
+                           do i=before,after
+                              if (allocated(idx)) call check_for_repeat(i,repetition)
+                              if (.not.repetition) then
+
+                                 call resize
+                                 last=size(idx)
+                                 idx(last)=i
+                              end if
+                           enddo
+
+                        endif
+
+                  else
+
+                     read(strg,*,IOSTAT=error) single
+                     call check(error)
+
+                     if (allocated(idx)) call check_for_repeat(single,repetition)
+                     if (.not.repetition) then
+                        call resize
+                        last=size(idx)
+                        idx(last)=single
+                     endif      
+                  endif
+                  strg=''
+                  print *,idx
+                  exit
             endif
-         !enddo
-    
 
         
+      enddo
        end subroutine string_to_integer
 
-       subroutine resize(idx)
-         integer,allocatable::idx(:)
+      subroutine check(err)
+      integer, intent(in) :: err
+      if (err .ne. 0) then
+         write(*,*) 'List specified not correctly, termination of cefine'
+         STOP
+      endif
+      end subroutine check
+      
+       subroutine resize
+         use dyn_array
          integer :: k
+         integer, allocatable:: buffer(:)
          if (.not.(allocated(idx))) then
-            allocate(idx(1))
+            allocate(idx(1),source=0)
          else
+            allocate(buffer(size(idx)+1), source=0)
+            buffer(:)=idx(:)
+            deallocate(idx)
+            call move_alloc(buffer, idx)
+         endif
 
        end subroutine resize
-
+      
+      subroutine check_for_repeat(num,rep)
+      use dyn_array
+      implicit none
+      integer, intent(in) :: num
+      logical, intent(out) :: rep
+      integer :: i,j
+      do i=1, size(idx)
+         if (num.eq.idx(i)) then
+            rep=.true.
+            exit
+         endif
+         rep=.false.
+      enddo
+      end subroutine
+      
 !       subroutine setL(L,arg)
 !       logical L,arg
 !       L=arg
