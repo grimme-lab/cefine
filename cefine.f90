@@ -40,6 +40,7 @@ logical DFPT2, FC, pr, OR, RIK, NOVDW, EX, CP1, CP2, POL, CC, ECP
 logical COORD, FOLD, MOLD, RANGST, SCS, TRUNC,LIB,ALIB,LAP,NDIFF
 logical da,FON,TS,R12,MRCI,COSMO,OPTI,ECHO,TEST,OLDMO,SOS,ZERO,FAKE
 logical strange_elem,diffuse, egrid, XMOL, MARIJ,REF,nori,BJ,ATM,D4
+logical nomarij
 logical deletion_failed, RMGF, RMF
 logical cosx,nocosx ! SAW: added seminumerical exchange = COSX
 logical hcore ! Modify control file to initiate hcore guess
@@ -138,6 +139,7 @@ pr=.true.
       LAP  =.false.
       EGRID=.false.
       MARIJ=.false.
+      NOMARIJ=.false.
       QUICK=.false.
 !       BJ=.false.
       RMGF=.false.
@@ -328,6 +330,7 @@ pr=.true.
          write(*,*)'vdw     on   #  sets DFT-D2(BJ) '       
          write(*,*)'echo    on   #  more printing'       
          write(*,*)'marij        #sets $marij '
+         write(*,*)'nomarij      #forbids $marij even for larger systems'
          write(*,*)'no-rij       #no RIJ for hybrids, if functional is known'
          write(*,*)'nodiff       #turns off diff density feature of TM'
          stop
@@ -384,6 +387,7 @@ pr=.true.
             if(index(arg(i),'-gf').ne.0)    RMGF=.true.
             if(index(arg(i),'-fpol').ne.0)    RMF=.true.
             if(index(arg(i),'-marij ').ne.0) MARIJ=.true.
+            if(index(arg(i),'-nomarij ').ne.0) NOMARIJ=.true.
             if(index(arg(i),'-fold').ne.0)  FOLD=.true. 
             if(index(arg(i),'-mold').ne.0)  MOLD=.true. 
             if(index(arg(i),'-modeht').ne.0)MODEHT=.true. 
@@ -1496,12 +1500,14 @@ if( index(func,'b3-lyp').ne.0 &
      .or.index(func,'pbe0'  ).ne.0 &
               ) then
 else
-   atmp="echo '$marij' >> control"
-   call system(trim(atmp))
-   atmp="echo '   precision   0.100D-06' >> control"
-   call system(trim(atmp))
-   atmp="echo '   lmaxmom            12' >> control"
-   call system(trim(atmp))
+   if (.not.nomarij) then
+       atmp="echo '$marij' >> control"
+       call system(trim(atmp))
+       atmp="echo '   precision   0.100D-06' >> control"
+       call system(trim(atmp))
+       atmp="echo '   lmaxmom            12' >> control"
+       call system(trim(atmp))
+    endif
 endif
 endif
 
