@@ -50,7 +50,7 @@ logical COORD, FOLD, MOLD, RANGST, SCS, TRUNC,LIB,ALIB,LAP,NDIFF
 logical da,FON,TS,R12,MRCI,COSMO,OPTI,ECHO,TEST,OLDMO,SOS,ZERO,FAKE
 logical strange_elem,diffuse, egrid, XMOL, MARIJ,REF,nori,BJ,ATM,D4
 
-logical deletion_failed, RMGF, RMF
+logical deletion_failed, RMGF, RMF,MSC
 logical cosx,nocosx ! SAW: added seminumerical exchange = COSX
 logical hcore ! Modify control file to initiate hcore guess
 
@@ -1206,6 +1206,7 @@ endif
 ! ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       if(io.ne.6)close(io)
 
+      
       run1='HF'
       if(DFT)run1='DFT'
       if(MP2)run1='RI-MP2'
@@ -1634,7 +1635,7 @@ endif
             write(80,'(a)') atmp
           enddo
           300 continue
-      endif    
+      endif 
     end Program comand_line_define
 
 
@@ -1723,7 +1724,7 @@ endif
       22.990,24.305,26.982,28.086,30.974,32.060,35.453,39.948, &
       39.098,40.080,44.956,47.900,50.942,51.996,54.938,55.847,58.933,58.700,63.546, &
       65.380,69.720,72.590,74.922,78.960,79.904,83.800, &
-      85.468,87.620,88.906,91.220,92.906,95.940,98.000,101.07,102.91,106.40,107.87, &
+      85.468,87.620,88.906,91.300,92.906,95.940,98.000,101.07,102.91,106.40,107.87, &
       112.41,114.82,118.69,121.75,127.60,126.91,131.30, &
       132.91,137.33,138.91,140.12,140.91,144.24,145.00,150.40,151.96,157.25,158.93,162.50, &
       164.93,167.26,168.93,173.04,174.97,178.49,180.95,183.85,186.21,190.20,192.22,195.09, &
@@ -1754,7 +1755,6 @@ endif
          if(e.eq.elemnt(i))then
             NAT=I
             if (scaled) call add_to_matrix(at_mass(i),atl)
-
             RETURN
          ENDIF
       ENDDO
