@@ -31,7 +31,7 @@ character*80 list
 character*80 arg(maxarg)    
 character*80 out,run1,run2,run3
 character*80 func           
-character*80 grid          
+character*80 grid,cosxgrid          
 character*80 bas            
 character*80 sym            
 character*80 atmp           
@@ -49,8 +49,11 @@ logical DFPT2, FC, pr, OR, RIK, NOVDW, EX, CP1, CP2, POL, CC, ECP
 logical COORD, FOLD, MOLD, RANGST, SCS, TRUNC,LIB,ALIB,LAP,NDIFF
 logical da,FON,TS,R12,MRCI,COSMO,OPTI,ECHO,TEST,OLDMO,SOS,ZERO,FAKE
 logical strange_elem,diffuse, egrid, XMOL, MARIJ,REF,nori,BJ,ATM,D4
-logical deletion_failed, RMGF, RMF, MSC
-logical cosx ! SAW: added seminumerical exchange = COSX
+
+logical deletion_failed, RMGF, RMF
+logical cosx,nocosx ! SAW: added seminumerical exchange = COSX
+logical hcore ! Modify control file to initiate hcore guess
+
 logical modbas  !basis defined in input
 logical modgrid  !grid defined in input
 logical modrad  !radsize defined in input
@@ -71,7 +74,7 @@ integer iat(10000)
 
 pr=.true. 
 !    .'--------------------------------------------'
-      if(pr) write(*,*)'Command line define V2.23, SG,HK 2006-18  August 2018 (-h for help) '
+      if(pr) write(*,*)'Command line define V2.24, SG,HK,MM January 2022 (-h for help) '
 !     write(*,*)
 !    .'--------------------------------------------'
       io=1
@@ -85,6 +88,7 @@ pr=.true.
       desythr=0.05
       scfconv=7
       grid   ='m4'
+      cosxgrid='m2'
       ricore =1000
       intmem =1000
       maxcor =1000
@@ -107,6 +111,8 @@ pr=.true.
       RI   =.true.
       RIK  =.false.
       COSX = .false. !SAW
+      NOCOSX = .false. ! MM
+      hcore = .false.
       R12  =.false.
       MODEHT=.false.
       RANGST=.false.
@@ -291,7 +297,9 @@ pr=.true.
          write(*,*)'   -ri'
          write(*,*)'   -nofc (all e-corr. for MP2)'
          write(*,*)'   -rijk (RI for HF/hybrids)'  
-         write(*,*)'   -rijcosx (seminum. exchange w/ COS alg. for hybrids)'   !SAW
+         write(*,*)'   -senex (seminum. exchange w/ COS alg. for hybrids)'   !SAW + MM
+         write(*,*)'   -nosenex (force NO seminum. exchange w/ COS alg. for hybrids)'   !MM
+         write(*,*)'   -senexgrid <string>  # default: m2'
          write(*,*)'   -or (set flags for OR, escf)'
          write(*,*)'   -ex (set flags UV/CD, escf)'
          write(*,*)'   -fold (take forceapprox from previous run)'
@@ -418,7 +426,9 @@ pr=.true.
             if(index(arg(i),'-cp1').ne.0)   CP1=.true. 
             if(index(arg(i),'-cp2').ne.0)   CP2=.true. 
             if(index(arg(i),'-rijk').ne.0)  RIK=.true. 
-            if(index(arg(i),'-rijcosx').ne.0)  COSX=.true. 
+            if(index(arg(i),'-senex').ne.0)  COSX=.true. 
+            if(index(arg(i),'-nosenex').ne.0)  NOCOSX=.true. 
+            if(index(arg(i),'-hcore').ne.0)  hcore=.true. 
             if(index(arg(i),'-trunc').ne.0) TRUNC=.true. 
             if(index(arg(i),'-fon').ne.0)   FON=.true. 
             if(index(arg(i),'-ts').ne.0)    TS=.true. 
@@ -508,6 +518,9 @@ pr=.true.
             if(index(arg(i),'-grid').ne.0) then
               grid =arg(i+1)
               modgrid=.true.
+            endif
+            if(index(arg(i),'-senexgrid').ne.0) then
+              cosxgrid =arg(i+1)
             endif
             if(index(arg(i),'-bas').ne.0) then
                bas  =arg(i+1)
@@ -781,6 +794,30 @@ if(func.eq.'pbe0-3c'.or.func.eq.'pbe03c')then
     if(.not.modaux) noauxg=.true.
     if(extol.lt.0) extol= 2.5d0
 endif
+! MM define wB97X-3c defaults
+if(func.eq.'wb97x-3c'.or.func.eq.'wb97x3c')then
+    write(*,*) 'Setting up a wB97X-3c calculation!'
+    func='wb97x-3c'
+    D4=.true.
+    BJ=.false.
+    ATM=.false.
+    ZERO=.false.
+    if(.not.modgrid)then
+        grid='m4'
+    endif
+    if(.not.modbas) then
+        bas='vDZP'
+    endif
+    if (.not.nocosx) then
+        cosx=.true.
+    endif
+    ECP=.true.
+endif
+
+! MM set up ECP in general if vDZP basis is chosen
+if (bas .eq. 'vDZP') then
+    ECP=.true.
+endif
 
 
 
@@ -882,12 +919,20 @@ endif
 ! ECPs
       if(ECP) then
       write(*,*) 'WARNING: Check BASIS/ECPs !!'
-          write(io,*)'ecp  all ecp-2-sdf'
+          if(bas .eq. 'vDZP')then
+            write(io,*)'ecp all ecp-vDZP'
+          else
+            write(io,*)'ecp  all ecp-2-sdf'
+          endif
         do l=1,ntypes    
          write(io,'('' '')') 
          write(io,'('' '')') 
         enddo
-          write(io,*)'ecp  all ecp-10-sdf'
+          if(bas .eq. 'vDZP')then
+              write(io,*)'ecp all ecp-vDZP'
+          else
+              write(io,*)'ecp  all ecp-10-sdf'
+          endif
         do l=1,ntypes    
          write(io,'('' '')') 
          write(io,'('' '')') 
@@ -1027,7 +1072,7 @@ endif
          write(io,*)' '
          write(io,*)' '
          write(io,*)' '
-      if(irare.eq.0)write(io,*)'*'
+      if ((irare.eq.0).or.((irare.le.2).and.(charge.eq.1).and.(nopen.eq.1))) write(io,*)'*'
       endif !uhf
       endif ! mos-setup
       write(io,*)'    '
@@ -1050,14 +1095,19 @@ endif
       endif
       if(RI)then
          write(io,*)'ri '
-         write(io,*)'on '
          if(ALIB) then
-          do l=1,ntypes     ! hok
-          write(io,*)'newlib '
-          write(io,*) trim(newlib)
-          write(io,*) 'lib'
-          enddo
+             do l=1,ntypes     ! hok
+                write(io,*)'newlib '
+                write(io,*) trim(newlib)
+                write(io,*) 'lib'
+             enddo
          endif
+         if(bas .eq. 'vDZP')then
+             write(io,*) 'jbas'
+             write(io,*) 'b all universal'
+             write(io,*) '*'
+         endif
+         write(io,*)'on '
          write(io,*)'m  '
          write(io,*)ricore
          write(io,*)'q'
@@ -1072,10 +1122,11 @@ endif
       elseif(COSX) then
       write(io,*)'senex'
       write(io,*)'on'
-      write(io,*)'y'
+      write(io,*)'yes'
+      write(io,*)'yes'
       write(io,*)'g'
-      write(io,'(a20)') grid
-      write(io,*)'y'
+      write(io,'(a20)') cosxgrid
+      write(io,*)'yes'
       write(io,*)'q'
       endif
 
@@ -1287,18 +1338,18 @@ endif
          call system("echo '   itrvec 1' >>control")
          call system("echo '   tradius 0.05 ' >>control")
          call system("echo '   radmax  0.05 ' >>control")
-         call system("echo '   threchange  5.0d-7' >>control")
-         call system("echo '   thrrmsgrad  5.0d-5' >>control")
-         call system("echo '   thrmaxdispl 1.0d-1' >>control")
-         call system("echo '   thrrmsdispl 1.0d-1' >>control")
+         !call system("echo '   threchange  5.0d-7' >>control")
+         !call system("echo '   thrrmsgrad  5.0d-5' >>control")
+         !call system("echo '   thrmaxdispl 1.0d-1' >>control")
+         !call system("echo '   thrrmsdispl 1.0d-1' >>control")
       else  
          call system("echo '$statpt'   >>control")
          call system("echo '   itrvec 0' >>control")
          call system("echo '   tradius 0.3 ' >>control")
-         call system("echo '   threchange  5.0d-7' >>control")
-         call system("echo '   thrrmsgrad  5.0d-5' >>control")
-         call system("echo '   thrmaxdispl 1.0d-1' >>control")
-         call system("echo '   thrrmsdispl 1.0d-1' >>control")
+         !call system("echo '   threchange  5.0d-7' >>control")
+         !call system("echo '   thrrmsgrad  5.0d-5' >>control")
+         !call system("echo '   thrmaxdispl 1.0d-1' >>control")
+         !call system("echo '   thrrmsdispl 1.0d-1' >>control")
       endif
 ! specify where to find hessian
       if(TROLD) then    
@@ -1454,7 +1505,19 @@ endif
         write(atmp,"(a,i0,a)") "sed -i '/gridsize/a\   radsize    ",radsize,"' control"
         call system(trim(atmp))
       endif
-      
+        
+      if (sym .eq. "c1" .and. hcore) then
+          write(*,*) "! Forcing HCORE guess !"
+          inquire(file="alpha", exist=da)
+          if(da)then
+              call system("sed -i 's/$uhfmo_alpha/$uhfmo_alpha none/g' control")
+              call system("sed -i 's/$uhfmo_beta/$uhfmo_beta none/g' control")
+              call system("rm -f alpha beta")
+          else
+              call system("sed -i 's/$scfmo/$scfmo none/g' control")
+              call system("rm -f mos")
+          endif
+      endif
 
 !JGB modify K tolerance
 if(extol.gt.0.0d0) then
@@ -1619,7 +1682,8 @@ endif
          endif
          if(i.gt.10) na(i)=na(i)+1
 ! cts check for Cu/Pd problem
-         if(i.eq.29.or.i.eq.46) cu_pd=.true.
+         ! if(i.eq.29.or.i.eq.46) cu_pd=.true.
+         if(i.eq.46) cu_pd=.true.
       endif
       goto 10
 100   close(1)
