@@ -1635,6 +1635,8 @@ endif
             write(80,'(a)') atmp
           enddo
           300 continue
+          close(80)
+          close(81)
       endif 
     end Program comand_line_define
 
