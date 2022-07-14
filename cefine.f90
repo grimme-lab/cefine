@@ -1344,7 +1344,7 @@ endif
       if(TS) then
          call system("echo '$statpt'   >>control")
          ts_string="echo '   itrvec "//ts_str
-         ts_string=ts_string//"' >>control"
+             ts_string=ts_string//"' >>control"
          call system(ts_string)
          call system("echo '   tradius 0.05 ' >>control")
          call system("echo '   radmax  0.05 ' >>control")
