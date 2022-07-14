@@ -25,7 +25,7 @@ Program comand_line_define
 use dyn_array
 implicit none
 
-integer maxarg,io,i,nn,err
+integer maxarg,io,i,nn,err,ts_num
 parameter (maxarg=20)
 character*80 list
 character*80 arg(maxarg)    
@@ -43,6 +43,8 @@ character*80 homedir,cefinerc
 character*80 str_scale
 character*2 baselem(85)
 character*2 baselem2(60)
+character(len=:),allocatable :: ts_string
+character(len=2) :: ts_str
 real*8 extol !tolerance of K integrals
 logical RI, MP2, DFT, VDW, DESY, OPT, KEEP, UHF, MODEHT,QUICK,TROLD
 logical DFPT2, FC, pr, OR, RIK, NOVDW, EX, CP1, CP2, POL, CC, ECP
@@ -50,7 +52,7 @@ logical COORD, FOLD, MOLD, RANGST, SCS, TRUNC,LIB,ALIB,LAP,NDIFF
 logical da,FON,TS,R12,MRCI,COSMO,OPTI,ECHO,TEST,OLDMO,SOS,ZERO,FAKE
 logical strange_elem,diffuse, egrid, XMOL, MARIJ,REF,nori,BJ,ATM,D4
 
-logical deletion_failed, RMGF, RMF,MSC
+logical deletion_failed, RMGF, RMF,MSC,SCFITER
 logical cosx,nocosx ! SAW: added seminumerical exchange = COSX
 logical hcore ! Modify control file to initiate hcore guess
 
@@ -84,7 +86,7 @@ pr=.true.
       run3='define<def.inp>define.out'
 
 ! defaults
-      maxiter=125 
+      maxiter=250
       desythr=0.05
       scfconv=7
       grid   ='m4'
@@ -310,7 +312,7 @@ pr=.true.
          write(*,*)'   -pol (set flags C6 computation, escf)'
          write(*,*)'   -cp1 (counterpoise computation, frag1, calls splitmol)'
          write(*,*)'   -cp2 (counterpoise computation, frag2, calls splitmol)'
-         write(*,*)'   -ts  (statpt TS search settings)'
+         write(*,*)'   -ts <integer> (statpt TS search settings, def ts 1)'
          write(*,*)'   -r12 (R12/F12 options for ricc2)'
          write(*,*)'   -dftmrci (sets cbas, bhlyp etc)'
          write(*,*)'   -cosmo <real> (COSMO with dk=real)' 
@@ -431,7 +433,12 @@ pr=.true.
             if(index(arg(i),'-hcore').ne.0)  hcore=.true. 
             if(index(arg(i),'-trunc').ne.0) TRUNC=.true. 
             if(index(arg(i),'-fon').ne.0)   FON=.true. 
-            if(index(arg(i),'-ts').ne.0)    TS=.true. 
+            if(index(arg(i),'-ts').ne.0) then
+                read(arg(i+1),*,IOSTAT=err) ts_num
+                if (err .ne. 0) ts_num=1
+                write(ts_str,'(I2)') ts_num
+                TS=.true. 
+            endif
             if(index(arg(i),'-r12').ne.0)   R12=.true.
             if(index(arg(i),'-dftmrci').ne.0) then 
              MRCI=.true.
@@ -1336,7 +1343,9 @@ endif
       endif
       if(TS) then
          call system("echo '$statpt'   >>control")
-         call system("echo '   itrvec 1' >>control")
+         ts_string="echo '   itrvec "//ts_str
+         ts_string=ts_string//"' >>control"
+         call system(ts_string)
          call system("echo '   tradius 0.05 ' >>control")
          call system("echo '   radmax  0.05 ' >>control")
          !call system("echo '   threchange  5.0d-7' >>control")
