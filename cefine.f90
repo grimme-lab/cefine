@@ -15,11 +15,19 @@
 ! You should have received a copy of the GNU Lesser General Public License
 ! along with cefine. If not, see <https://www.gnu.org/licenses/>.
 
+module dyn_array 
+   integer, allocatable :: idx(:)
+   real, allocatable :: matrix(:,:)
+end module
+
 Program comand_line_define
+
+use dyn_array
 implicit none
 
-integer maxarg,io,i,nn
+integer maxarg,io,i,nn,err,ts_num
 parameter (maxarg=20)
+character*80 list
 character*80 arg(maxarg)    
 character*80 out,run1,run2,run3
 character*80 func           
@@ -32,8 +40,11 @@ character*80 coord_name
 character*80 newlib
 character*80 dbas   
 character*80 homedir,cefinerc
+character*80 str_scale
 character*2 baselem(85)
 character*2 baselem2(60)
+character(len=:),allocatable :: ts_string
+character(len=2) :: ts_str
 real*8 extol !tolerance of K integrals
 logical RI, MP2, DFT, VDW, DESY, OPT, KEEP, UHF, MODEHT,QUICK,TROLD
 logical DFPT2, FC, pr, OR, RIK, NOVDW, EX, CP1, CP2, POL, CC, ECP
@@ -41,9 +52,10 @@ logical COORD, FOLD, MOLD, RANGST, SCS, TRUNC,LIB,ALIB,LAP,NDIFF
 logical da,FON,TS,R12,MRCI,COSMO,OPTI,ECHO,TEST,OLDMO,SOS,ZERO,FAKE
 logical strange_elem,diffuse, egrid, XMOL, MARIJ,REF,nori,BJ,ATM,D4
 logical nomarij
-logical deletion_failed, RMGF, RMF
+logical deletion_failed, RMGF, RMF,MSC,SCFITER
 logical cosx,nocosx ! SAW: added seminumerical exchange = COSX
 logical hcore ! Modify control file to initiate hcore guess
+
 logical modbas  !basis defined in input
 logical modgrid  !grid defined in input
 logical modrad  !radsize defined in input
@@ -53,9 +65,10 @@ logical hf3c ! perform HF-3c calculation
 logical donl ! perform nl non-self-consistent
 logical gcpinfo !for pbe-3c, pbe0-3c, b3-lyp-3c (echo into control)
 integer ricore, scfconv, intmem, thime, maxcor, rpacor,radsize
-integer charge, maxiter, nheavy, nopen, nat
+integer charge, maxiter, nheavy, nopen, nat, f
 integer kfrag, libnr, l, ntypes, irare, att(20)
-real*8  desythr,xx(5),thize,cosmodk,dum,fp
+integer mend1,mend2,mstart
+real*8  desythr,xx(5),thize,cosmodk,dum,fp,mscale,b_scale,readaa
 
 !     coord file handling
 real*8 xyz(3,10000)
@@ -68,12 +81,12 @@ pr=.true.
 !    .'--------------------------------------------'
       io=1
 
-      out='def.inp'
+      out='def.inp' !> temporary input file name 
 !      run3='define_huge<def.inp>define.out'
       run3='define<def.inp>define.out'
 
 ! defaults
-      maxiter=125 
+      maxiter=250
       desythr=0.05
       scfconv=7
       grid   ='m4'
@@ -154,6 +167,8 @@ pr=.true.
       NDIFF=.false.
       ECP=.false.
       CC=.false.
+      MSC=.false. !> mass scaling
+
       modbas=.false.
       modaux=.false.
       noauxg=.false.
@@ -165,9 +180,10 @@ pr=.true.
 !FB gcpinfo
       gcpinfo=.false.
 
-      CALL get_environment_variable("HOME", homedir)
-      cefinerc=trim(homedir)//'/.cefinerc'
-      inquire(file=cefinerc,exist=da)
+      !> check for existence of .cefinerc
+      CALL get_environment_variable("HOME", homedir) !> get home directory to variable
+      cefinerc=trim(homedir)//'/.cefinerc' !> to remove trailing character
+      inquire(file=cefinerc,exist=da) !> check for existence
       if(da)then
          write(*,*) cefinerc
          open(unit=20,file=cefinerc)
@@ -232,7 +248,7 @@ pr=.true.
          endif
          if(index(atmp,'nodiff').ne.0)NDIFF=.true. 
          goto 842
- 942     close(20)
+942     close(20)
       endif
             
 
@@ -259,6 +275,7 @@ pr=.true.
          write(*,*)'   -scs  (do RI-SCS-MP2)'
          write(*,*)'   -sos  (do RI-SOS-MP2)'
          write(*,*)'   -lsos /-lap  (do RI-Laplace-SOS-MP2)'
+         write(*,*)'   -msc_exc  <string> (z.B. 1-9, list of atoms that should NOT be scaled) <real> (scaling factor, default 1000000)'
          write(*,*)'   -cc  (do RI-CCSD(T))'
          write(*,*)'   -d3   ($disp3 -bj)'
          write(*,*)'   -d3atm ($disp3 -bj -abc)' ! FB implemented
@@ -296,7 +313,7 @@ pr=.true.
          write(*,*)'   -pol (set flags C6 computation, escf)'
          write(*,*)'   -cp1 (counterpoise computation, frag1, calls splitmol)'
          write(*,*)'   -cp2 (counterpoise computation, frag2, calls splitmol)'
-         write(*,*)'   -ts  (statpt TS search settings)'
+         write(*,*)'   -ts <integer> (statpt TS search settings, def ts 1)'
          write(*,*)'   -r12 (R12/F12 options for ricc2)'
          write(*,*)'   -dftmrci (sets cbas, bhlyp etc)'
          write(*,*)'   -cosmo <real> (COSMO with dk=real)' 
@@ -419,7 +436,12 @@ pr=.true.
             if(index(arg(i),'-hcore').ne.0)  hcore=.true. 
             if(index(arg(i),'-trunc').ne.0) TRUNC=.true. 
             if(index(arg(i),'-fon').ne.0)   FON=.true. 
-            if(index(arg(i),'-ts').ne.0)    TS=.true. 
+            if(index(arg(i),'-ts').ne.0) then
+                read(arg(i+1),*,IOSTAT=err) ts_num
+                if (err .ne. 0) ts_num=1
+                write(ts_str,'(I2)') ts_num
+                TS=.true. 
+            endif
             if(index(arg(i),'-r12').ne.0)   R12=.true.
             if(index(arg(i),'-dftmrci').ne.0) then 
              MRCI=.true.
@@ -536,6 +558,25 @@ pr=.true.
             endif                                ! ...
 !c keep outputs for debuging purposes
             if(index(arg(i),'-keep').ne.0)KEEP=.true. 
+            
+            !> mass scaling
+            if(index(arg(i),'-msc_exc').ne.0)then
+               !> next argument should a list of atoms
+               list=arg(i+1)
+               if ( len(list) .eq. 0 ) then
+                   write (*,*) "The list of atoms are not provided, masses will not be scaled"
+               else
+                   call string_to_integer(list)!,idx)
+               endif
+               
+               !> last one should be scaling factor
+               read(arg(i+2),*,IOSTAT=err) mscale
+               if (err .ne. 0) then
+                   write(*,*) 'Scaling factor is not provided, 1E7 will be used'
+                   mscale=1000000
+               endif
+               MSC=.true.
+            endif
          endif
       enddo
 !c read possible file .SYM and .UHF
@@ -847,8 +888,8 @@ endif
       if (COSX) RI=.true.
 ! c how many different heavy atoms
       call atoms(nheavy,nat,ntypes,strange_elem,irare,att)
+      !> nat -atom counter, if one no opt 
       if(nat.eq.1) OPT=.false.
-
       if(io.ne.6)open(unit=io,file=out)
 ! ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 ! c coord 
@@ -875,6 +916,8 @@ endif
       if(OPT ) write(io,'('' ired '')')
       write(io,*)'*'
       if(.not.OPT ) write(io,'('' no '')')
+!> the end of molecular geometry specification
+
 ! c basis
 ! hok
 ! own basis library in /$HOME/.definerc
@@ -991,7 +1034,17 @@ endif
          close(43,status='delete')
          close(43)
       endif
+
+      !> mass scaling
+      if(MSC)then
+          do f=1,size(matrix,2)
+            write(io,*) 'm ',int(matrix(1,f)),' ',matrix(2,f)
+          enddo
+      endif
       write(io,*)'*'
+!> Atomic attribute definition menu ends
+
+    !STOP
 ! c HUECKEL
       if(OLDMO)then
       write(io,*)'use TMP.MOS/control'
@@ -1163,6 +1216,7 @@ endif
 ! ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       if(io.ne.6)close(io)
 
+      
       run1='HF'
       if(DFT)run1='DFT'
       if(MP2)run1='RI-MP2'
@@ -1214,6 +1268,7 @@ endif
 ! c     call system('sdg symmetry')
       if(pr)write(*,'(''#atoms='',i3)')nat
 ! c     call system('grep "nbf(AO)" control')
+    
       call system('eiger > tmp.eiger')
       call system('grep "Number of MOs" tmp.eiger')
       
@@ -1291,7 +1346,9 @@ endif
       endif
       if(TS) then
          call system("echo '$statpt'   >>control")
-         call system("echo '   itrvec 1' >>control")
+         ts_string="echo '   itrvec "//ts_str
+             ts_string=ts_string//"' >>control"
+         call system(ts_string)
          call system("echo '   tradius 0.05 ' >>control")
          call system("echo '   radmax  0.05 ' >>control")
          !call system("echo '   threchange  5.0d-7' >>control")
@@ -1530,7 +1587,6 @@ endif
 
 ! set difference densities expansion to zero
       if(NDIFF) call system("echo '$scfdenapproxl 0' >> control")
-
 ! "close" control file
       call system("echo '$end' >>control")
 ! c print some control file settings
@@ -1566,6 +1622,36 @@ endif
 
       if(.not.KEEP) call system('rm -rf define.out def.inp prep.inp tmp.eiger')
       if(OLDMO.and..not.keep) call system("rm -r TMP.MOS")
+      
+      !> to change control file masses
+      if (MSC) then
+          open(unit=81,status='scratch')
+          open(unit=80,file='control')
+          do
+              read(80,'(a)',end=200) atmp
+              if (index(atmp,'mass').ne.0) then
+                  mstart=index(atmp,'mass')
+                  b_scale=READAA(atmp,mstart,mend1,mend2) !> original scaling
+                  b_scale=b_scale*mscale
+                  write(str_scale,*) b_scale
+                  atmp(mend1:len(atmp))=str_scale
+                  write(81,'(a)') atmp
+                else
+                  write(81,'(a)') atmp
+              endif
+          enddo
+          200 continue 
+          !> create buffer file, to replce lines
+          rewind(81)
+          rewind(80)
+          do
+            read(81,'(a)',end=300) atmp
+            write(80,'(a)') atmp
+          enddo
+          300 continue
+          close(80)
+          close(81)
+      endif 
     end Program comand_line_define
 
 
@@ -1602,7 +1688,7 @@ endif
       if(nn.eq.3)then
          nat=nat+1
          j=j+1
-         call elem(a80,i)
+         call elem(a80,i,nat)
 ! select rare gas and
          if(i.eq.2.or.i.eq.10.or.i.eq.18.or. &
           i.eq.36.or.i.eq.54.or.i.eq.86)irare=1
@@ -1628,10 +1714,13 @@ endif
 
 ! CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
 
-      SUBROUTINE ELEM(KEY1, NAT)
+      SUBROUTINE ELEM(KEY1, NAT,atl)
       IMPLICIT DOUBLE PRECISION (A-H,O-Z)
       CHARACTER*(*) KEY1
       CHARACTER*2 ELEMNT(107),E
+      real*4 at_mass(107)
+      integer atl !> nat from atoms routine, shoes the  list
+      logical scaled
 
       DATA ELEMNT/'h ','he', &
       'li','be','b ','c ','n ','o ','f ','ne',  &
@@ -1646,6 +1735,22 @@ endif
       'fr','ra','ac','th','pa','u ','np','pu','am','cm','bk','cf','xx',  &
       'fm','md','cb','xx','xx','xx','xx','xx'/
      
+      data at_mass/1.000,4.000, &
+      6.9410,9.0120,10.810,12.011,14.007,15.999,18.998,20.179, &
+      22.990,24.305,26.982,28.086,30.974,32.060,35.453,39.948, &
+      39.098,40.080,44.956,47.900,50.942,51.996,54.938,55.847,58.933,58.700,63.546, &
+      65.380,69.720,72.590,74.922,78.960,79.904,83.800, &
+      85.468,87.620,88.906,91.300,92.906,95.940,98.000,101.07,102.91,106.40,107.87, &
+      112.41,114.82,118.69,121.75,127.60,126.91,131.30, &
+      132.91,137.33,138.91,140.12,140.91,144.24,145.00,150.40,151.96,157.25,158.93,162.50, &
+      164.93,167.26,168.93,173.04,174.97,178.49,180.95,183.85,186.21,190.20,192.22,195.09, &
+      196.97,200.59,204.37,207.20,208.98,209.00,210.00,222.00, &
+      223.00,226.02,227.03,232.04,231.04,238.03,237.05,242.00,243.00,247.00,247.00,251.00,252.00, &
+      257.00,258.00,250.00,260.00,261.00,262.00,263.00,262.00 /
+      
+      call in_list(atl,scaled)
+
+
       nat=0
       e='  '
       k=1
@@ -1665,11 +1770,81 @@ endif
       DO I=1,107
          if(e.eq.elemnt(i))then
             NAT=I
+            if (scaled) call add_to_matrix(at_mass(i),atl)
             RETURN
          ENDIF
       ENDDO
 
       end
+
+! C     *****************************************************************
+
+!>
+subroutine add_to_matrix(mass,atl)
+use dyn_array
+implicit none
+real,intent(in) :: mass
+integer, intent(in) :: atl
+integer :: counter, iter
+
+!>First need to add new entry
+call resize_matrix(counter)
+
+matrix(1,counter) = atl
+matrix(2,counter) = mass
+
+end subroutine add_to_matrix
+
+! C     *****************************************************************
+
+subroutine resize_matrix(counter)
+
+use dyn_array
+implicit none
+integer,intent(out) :: counter
+real, allocatable:: buffer(:,:)
+
+
+!> if not allocated, allocate
+if (.not.(allocated(matrix))) then
+    allocate(matrix(2,1),source=0.0000)
+    counter = 1
+!> otherwise make bigger
+else
+    allocate(buffer(2,size(matrix,2)+1), source=0.0000) !> make buffer bigger
+    buffer(:,:)=matrix(:,:)
+    deallocate(matrix)
+    call move_alloc(buffer, matrix)
+    counter = size(matrix,2)
+endif
+
+
+end subroutine resize_matrix
+
+
+! C     *****************************************************************
+
+!> to check if certain atom should be scaled
+subroutine in_list(atl,scaled)
+
+use dyn_array
+implicit none
+integer, intent(in) :: atl
+logical, intent(out) :: scaled
+integer :: i
+
+do i=1,size(idx)
+    
+    if (idx(i).eq.atl) then
+        scaled = .false.
+        return
+    else
+        scaled = .true.
+    endif
+
+enddo
+
+end subroutine
 
 ! C     *****************************************************************         
 
@@ -2186,10 +2361,149 @@ endif
        write(io,'(a)')'$end'
        close(4)
        end
+       
+       !> to convert string to integer array of values
+       subroutine string_to_integer(strg)
+         use dyn_array
+         implicit none
+         character(len=*) :: strg
+         
+         character(len=:),allocatable :: value1,value2
+         integer :: t, i,comma,skip,before,after,error,last,single
+         integer, allocatable:: test(:)
+         logical :: repetition
 
-!       subroutine setL(L,arg)
-!       logical L,arg
-!       L=arg
-!       print *,L
-!       end subroutine
+         do 
+            comma = index(strg,",")
+            if (comma .ne. 0) then
+                 value1=strg(:comma-1)
+                 skip = index(value1,"-")
+                 if (skip .ne. 0) then
+                        read(value1(:skip-1),*,IOSTAT=error) before
+                        call check(error)
+                        
+                        read(value1(skip+1:),*,IOSTAT=error) after 
+                        call check(error)
 
+                        if (after<=before) then 
+                           error = 1
+                           call check(error)
+                        else
+                        
+                           do i=before,after
+                              if (allocated(idx)) call check_for_repeat(i,repetition)
+                              if (.not.repetition) then
+                                 call resize
+                                 last=size(idx)
+                                     idx(last)=i
+                              endif
+                           enddo
+
+                        endif
+
+                        strg=strg(comma+1:)
+                  else
+                     read(value1(:comma-1),*,IOSTAT=error) single
+                     call check(error)
+                     
+                     if (allocated(idx)) call check_for_repeat(single,repetition)
+                     if (.not.repetition) then
+
+                        call resize
+                        last=size(idx)
+                        idx(last)=single
+                    
+                     
+                     endif
+                     
+                     strg=strg(comma+1:)
+                     
+                  endif
+            else
+                 skip = index(strg,"-")
+                 if (skip .ne. 0) then
+                        read(strg(:skip-1),*,IOSTAT=error) before
+                        call check(error)
+                        
+                        read(strg(skip+1:),*,IOSTAT=error) after 
+                        call check(error)
+
+                        if (after<=before) then 
+                           error=1
+                           call check(error)
+                        else
+                        
+                           do i=before,after
+                              if (allocated(idx)) call check_for_repeat(i,repetition)
+                              if (.not.repetition) then
+
+                                 call resize
+                                 last=size(idx)
+                                 idx(last)=i
+                              end if
+                           enddo
+
+                        endif
+
+                  else
+
+                     read(strg,*,IOSTAT=error) single
+                     call check(error)
+
+                     if (allocated(idx)) call check_for_repeat(single,repetition)
+                     if (.not.repetition) then
+                        call resize
+                        last=size(idx)
+                        idx(last)=single
+                     endif      
+                  endif
+                  strg=''
+                  exit
+            endif
+
+        
+      enddo
+       end subroutine string_to_integer
+      
+      !> troubleshooting handling routine
+      subroutine check(err)
+      integer, intent(in) :: err
+      if (err .ne. 0) then
+         write(*,*) 'List specified not correctly, termination of cefine'
+         STOP
+      endif
+      end subroutine check
+      
+      !> change the size of array
+       subroutine resize
+
+         use dyn_array
+         integer :: k
+         integer, allocatable:: buffer(:)
+         if (.not.(allocated(idx))) then
+            allocate(idx(1),source=0)
+         else
+            allocate(buffer(size(idx)+1), source=0)
+            buffer(:)=idx(:)
+            deallocate(idx)
+            call move_alloc(buffer, idx)
+         endif
+
+       end subroutine resize
+     
+      !> check for repitions of numbers, if yes, do not include
+      subroutine check_for_repeat(num,rep)
+      use dyn_array
+      implicit none
+      integer, intent(in) :: num
+      logical, intent(out) :: rep
+      integer :: i,j
+      do i=1, size(idx)
+         if (num.eq.idx(i)) then
+            rep=.true.
+            exit
+         endif
+         rep=.false.
+      enddo
+      end subroutine
+      
